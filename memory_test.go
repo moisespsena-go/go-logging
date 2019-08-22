@@ -43,7 +43,7 @@ func TestMemoryBackend(t *testing.T) {
 	backend := NewMemoryBackend(8)
 	SetBackend(backend)
 
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 
 	if nil != MemoryRecordN(backend, 0) || 0 != backend.size {
 		t.Errorf("memory level: %d", backend.size)
@@ -81,7 +81,7 @@ func TestChannelMemoryBackend(t *testing.T) {
 	backend := NewChannelMemoryBackend(8)
 	SetBackend(backend)
 
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 
 	if nil != ChannelMemoryRecordN(backend, 0) || 0 != backend.size {
 		t.Errorf("memory level: %d", backend.size)

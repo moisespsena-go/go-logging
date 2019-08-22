@@ -65,11 +65,24 @@ type LeveledBackend interface {
 	Leveled
 }
 
+type PrinterLeveledBackend interface {
+	BackendPrinter
+	Leveled
+}
+
 type moduleLeveled struct {
 	levels    map[string]Level
 	backend   Backend
 	formatter Formatter
 	once      sync.Once
+}
+
+type moduleLeveledPrinter struct {
+	moduleLeveled
+}
+
+func (this moduleLeveledPrinter) Print(args ...interface{}) (err error) {
+	return this.backend.(Printer).Print(args...)
 }
 
 // AddModuleLevel wraps a log backend with knobs to have different log levels
@@ -78,11 +91,19 @@ func AddModuleLevel(backend Backend) LeveledBackend {
 	var leveled LeveledBackend
 	var ok bool
 	if leveled, ok = backend.(LeveledBackend); !ok {
-		leveled = &moduleLeveled{
-			levels:  make(map[string]Level),
-			backend: backend,
+		if _, ok := backend.(Printer); ok {
+			leveled = &moduleLeveledPrinter{moduleLeveled{
+				levels:  make(map[string]Level),
+				backend: backend,
+			}}
+		} else {
+			leveled = &moduleLeveled{
+				levels:  make(map[string]Level),
+				backend: backend,
+			}
 		}
 	}
+
 	return leveled
 }
 

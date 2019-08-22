@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
-	"github.com/op/go-logging"
+	"github.com/moisespsena-go/logging"
 )
 
-var log = logging.MustGetLogger("example")
+var log = logging.GetOrCreateLogger("example")
 
 // Example format string. Everything except the message has a custom color
 // which is dependent on the log level. Many fields have a custom output

@@ -17,7 +17,7 @@ func TestSequenceNoOverflow(t *testing.T) {
 	backend := InitForTesting(DEBUG)
 	sequenceNo = ^uint64(0)
 
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 	log.Debug("test")
 
 	if MemoryRecordN(backend, 0).ID != 0 {
@@ -28,7 +28,7 @@ func TestSequenceNoOverflow(t *testing.T) {
 func TestRedact(t *testing.T) {
 	backend := InitForTesting(DEBUG)
 	password := Password("123456")
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 	log.Debug("foo", password)
 	if "foo ******" != MemoryRecordN(backend, 0).Formatted(0) {
 		t.Errorf("redacted line: %v", MemoryRecordN(backend, 0))
@@ -38,7 +38,7 @@ func TestRedact(t *testing.T) {
 func TestRedactf(t *testing.T) {
 	backend := InitForTesting(DEBUG)
 	password := Password("123456")
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 	log.Debugf("foo %s", password)
 	if "foo ******" != MemoryRecordN(backend, 0).Formatted(0) {
 		t.Errorf("redacted line: %v", MemoryRecordN(backend, 0).Formatted(0))
@@ -47,7 +47,7 @@ func TestRedactf(t *testing.T) {
 
 func TestPrivateBackend(t *testing.T) {
 	stdBackend := InitForTesting(DEBUG)
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 	privateBackend := NewMemoryBackend(10240)
 	lvlBackend := AddModuleLevel(privateBackend)
 	lvlBackend.SetLevel(DEBUG, "")

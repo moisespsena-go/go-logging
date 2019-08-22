@@ -17,7 +17,7 @@ func TestLogCalldepth(t *testing.T) {
 	SetBackend(NewLogBackend(buf, "", log.Lshortfile))
 	SetFormatter(MustStringFormatter("%{shortfile} %{level} %{message}"))
 
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 	log.Info("test filename")
 
 	parts := strings.SplitN(buf.String(), " ", 2)
@@ -32,11 +32,11 @@ func TestLogCalldepth(t *testing.T) {
 	}
 }
 
-func c(log *Logger) { log.Info("test callpath") }
-func b(log *Logger) { c(log) }
-func a(log *Logger) { b(log) }
+func c(log *Log) { log.Info("test callpath") }
+func b(log *Log) { c(log) }
+func a(log *Log) { b(log) }
 
-func rec(log *Logger, r int) {
+func rec(log *Log, r int) {
 	if r == 0 {
 		a(log)
 		return
@@ -49,7 +49,7 @@ func testCallpath(t *testing.T, format string, expect string) {
 	SetBackend(NewLogBackend(buf, "", log.Lshortfile))
 	SetFormatter(MustStringFormatter(format))
 
-	logger := MustGetLogger("test")
+	logger := GetOrCreateLogger("test")
 	rec(logger, 6)
 
 	parts := strings.SplitN(buf.String(), " ", 3)
@@ -132,7 +132,7 @@ func BenchmarkLogLogBackendLongFileFlag(b *testing.B) {
 
 func RunLogBenchmark(b *testing.B) {
 	password := Password("foo")
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -154,7 +154,7 @@ func BenchmarkLogFixedIgnored(b *testing.B) {
 }
 
 func RunLogBenchmarkFixedString(b *testing.B) {
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -35,7 +37,53 @@ var (
 
 	// timeNow is a customizable for testing purposes.
 	timeNow = time.Now
+
+	// loggers stores Log objects by module name
+	loggers SyncedLoggers
 )
+
+// SyncedLoggers represents a parallel by module Logger registrator
+type SyncedLoggers struct {
+	loggers map[string]Logger
+	mu      sync.RWMutex
+}
+
+// Get returns a Logger object is has be registered, other wise, nil
+func (this *SyncedLoggers) Get(module string) Logger {
+	this.mu.RLock()
+	defer this.mu.RUnlock()
+	if this.loggers == nil {
+		return nil
+	}
+	return this.loggers[module]
+}
+
+// GetOrCreate returns a Logger object is has be registered, other wise, creates and registry new object
+func (this *SyncedLoggers) GetOrCreate(module string) (log Logger) {
+	if log = this.Get(module); log == nil {
+		this.mu.Lock()
+		defer this.mu.Unlock()
+		if this.loggers == nil {
+			this.loggers = map[string]Logger{}
+		}
+		log = NewLogger(module)
+		this.loggers[module] = log
+	}
+	return
+}
+
+var MustGetLogger = GetOrCreateLogger
+
+// Record representslog static record and contains the timestamp when the record
+// was created, an increasing id, filename and line and finally the actual
+// formatted log line.
+type RecordData struct {
+	ID      uint64
+	Time    time.Time
+	Module  string
+	Level   Level
+	Message string
+}
 
 // Record represents a log record and contains the timestamp when the record
 // was created, an increasing id, filename and line and finally the actual
@@ -88,9 +136,20 @@ func (r *Record) Message() string {
 	return *r.message
 }
 
-// Logger is the actual logger which creates log records based on the functions
+// Data returns the RecordData object.
+func (r *Record) Data() RecordData {
+	return RecordData{
+		r.ID,
+		r.Time,
+		r.Module,
+		r.Level,
+		r.Message(),
+	}
+}
+
+// Log is the actual logger which creates log records based on the functions
 // called and passes them to the underlying logging backend.
-type Logger struct {
+type Log struct {
 	Module      string
 	backend     LeveledBackend
 	haveBackend bool
@@ -100,27 +159,35 @@ type Logger struct {
 	ExtraCalldepth int
 }
 
+// NewLogger crates new Log object with module name
+func NewLogger(module string) *Log {
+	return &Log{Module: module}
+}
+
 // SetBackend overrides any previously defined backend for this logger.
-func (l *Logger) SetBackend(backend LeveledBackend) {
+func (l *Log) SetBackend(backend LeveledBackend) {
 	l.backend = backend
 	l.haveBackend = true
 }
 
-// TODO call NewLogger and remove MustGetLogger?
-
-// GetLogger creates and returns a Logger object based on the module name.
-func GetLogger(module string) (*Logger, error) {
-	return &Logger{Module: module}, nil
+// Backend return current backend if has be defined
+func (l *Log) Backend() LeveledBackend {
+	return l.backend
 }
 
-// MustGetLogger is like GetLogger but panics if the logger can't be created.
-// It simplifies safe initialization of a global logger for eg. a package.
-func MustGetLogger(module string) *Logger {
-	logger, err := GetLogger(module)
-	if err != nil {
-		panic("logger: " + module + ": " + err.Error())
-	}
-	return logger
+// GetOrCreateLogger returns a Logger object is has be registered in Loggers, other wise, creates and registry new object
+func GetOrCreateLogger(module string) Logger {
+	return loggers.GetOrCreate(module)
+}
+
+// GetLogger returns a Logger object based on the module name registered in Loggers.
+func GetLogger(module string) Logger {
+	return loggers.Get(module)
+}
+
+// MainLogger returns a Logger object based on the sys.Argv[0].
+func MainLogger() Logger {
+	return GetOrCreateLogger(filepath.Base(os.Args[0]))
 }
 
 // Reset restores the internal state of the logging library.
@@ -136,11 +203,11 @@ func Reset() {
 }
 
 // IsEnabledFor returns true if the logger is enabled for the given level.
-func (l *Logger) IsEnabledFor(level Level) bool {
+func (l *Log) IsEnabledFor(level Level) bool {
 	return defaultBackend.IsEnabledFor(level, l.Module)
 }
 
-func (l *Logger) log(lvl Level, format *string, args ...interface{}) {
+func (l *Log) log(lvl Level, format *string, args ...interface{}) {
 	if !l.IsEnabledFor(lvl) {
 		return
 	}
@@ -171,86 +238,86 @@ func (l *Logger) log(lvl Level, format *string, args ...interface{}) {
 }
 
 // Fatal is equivalent to l.Critical(fmt.Sprint()) followed by a call to os.Exit(1).
-func (l *Logger) Fatal(args ...interface{}) {
+func (l *Log) Fatal(args ...interface{}) {
 	l.log(CRITICAL, nil, args...)
 	os.Exit(1)
 }
 
 // Fatalf is equivalent to l.Critical followed by a call to os.Exit(1).
-func (l *Logger) Fatalf(format string, args ...interface{}) {
+func (l *Log) Fatalf(format string, args ...interface{}) {
 	l.log(CRITICAL, &format, args...)
 	os.Exit(1)
 }
 
 // Panic is equivalent to l.Critical(fmt.Sprint()) followed by a call to panic().
-func (l *Logger) Panic(args ...interface{}) {
+func (l *Log) Panic(args ...interface{}) {
 	l.log(CRITICAL, nil, args...)
 	panic(fmt.Sprint(args...))
 }
 
 // Panicf is equivalent to l.Critical followed by a call to panic().
-func (l *Logger) Panicf(format string, args ...interface{}) {
+func (l *Log) Panicf(format string, args ...interface{}) {
 	l.log(CRITICAL, &format, args...)
 	panic(fmt.Sprintf(format, args...))
 }
 
 // Critical logs a message using CRITICAL as log level.
-func (l *Logger) Critical(args ...interface{}) {
+func (l *Log) Critical(args ...interface{}) {
 	l.log(CRITICAL, nil, args...)
 }
 
 // Criticalf logs a message using CRITICAL as log level.
-func (l *Logger) Criticalf(format string, args ...interface{}) {
+func (l *Log) Criticalf(format string, args ...interface{}) {
 	l.log(CRITICAL, &format, args...)
 }
 
 // Error logs a message using ERROR as log level.
-func (l *Logger) Error(args ...interface{}) {
+func (l *Log) Error(args ...interface{}) {
 	l.log(ERROR, nil, args...)
 }
 
 // Errorf logs a message using ERROR as log level.
-func (l *Logger) Errorf(format string, args ...interface{}) {
+func (l *Log) Errorf(format string, args ...interface{}) {
 	l.log(ERROR, &format, args...)
 }
 
 // Warning logs a message using WARNING as log level.
-func (l *Logger) Warning(args ...interface{}) {
+func (l *Log) Warning(args ...interface{}) {
 	l.log(WARNING, nil, args...)
 }
 
 // Warningf logs a message using WARNING as log level.
-func (l *Logger) Warningf(format string, args ...interface{}) {
+func (l *Log) Warningf(format string, args ...interface{}) {
 	l.log(WARNING, &format, args...)
 }
 
 // Notice logs a message using NOTICE as log level.
-func (l *Logger) Notice(args ...interface{}) {
+func (l *Log) Notice(args ...interface{}) {
 	l.log(NOTICE, nil, args...)
 }
 
 // Noticef logs a message using NOTICE as log level.
-func (l *Logger) Noticef(format string, args ...interface{}) {
+func (l *Log) Noticef(format string, args ...interface{}) {
 	l.log(NOTICE, &format, args...)
 }
 
 // Info logs a message using INFO as log level.
-func (l *Logger) Info(args ...interface{}) {
+func (l *Log) Info(args ...interface{}) {
 	l.log(INFO, nil, args...)
 }
 
 // Infof logs a message using INFO as log level.
-func (l *Logger) Infof(format string, args ...interface{}) {
+func (l *Log) Infof(format string, args ...interface{}) {
 	l.log(INFO, &format, args...)
 }
 
 // Debug logs a message using DEBUG as log level.
-func (l *Logger) Debug(args ...interface{}) {
+func (l *Log) Debug(args ...interface{}) {
 	l.log(DEBUG, nil, args...)
 }
 
 // Debugf logs a message using DEBUG as log level.
-func (l *Logger) Debugf(format string, args ...interface{}) {
+func (l *Log) Debugf(format string, args ...interface{}) {
 	l.log(DEBUG, &format, args...)
 }
 

@@ -18,7 +18,7 @@ func TestFormat(t *testing.T) {
 	}
 	SetFormatter(f)
 
-	log := MustGetLogger("module")
+	log := GetOrCreateLogger("module")
 	log.Debug("hello")
 
 	line := MemoryRecordN(backend, 0).Formatted(0)
@@ -28,7 +28,7 @@ func TestFormat(t *testing.T) {
 }
 
 func logAndGetLine(backend *MemoryBackend) string {
-	MustGetLogger("foo").Debug("hello")
+	GetOrCreateLogger("foo").Debug("hello")
 	return MemoryRecordN(backend, 0).Formatted(1)
 }
 
@@ -109,13 +109,13 @@ func TestFormatFuncName(t *testing.T) {
 			"main",
 			"main",
 			"main"},
-		{"github.com/op/go-logging.func·001",
-			"github.com/op/go-logging",
+		{"github.com/moisespsena-go/logging.func·001",
+			"github.com/moisespsena-go/logging",
 			"go-logging",
 			"func·001",
 			"func·001"},
-		{"github.com/op/go-logging.stringFormatter.Format",
-			"github.com/op/go-logging",
+		{"github.com/moisespsena-go/logging.stringFormatter.Format",
+			"github.com/moisespsena-go/logging",
 			"go-logging",
 			"stringFormatter.Format",
 			"Format"},
@@ -154,7 +154,7 @@ func TestBackendFormatter(t *testing.T) {
 
 	SetBackend(b1, bf)
 
-	log := MustGetLogger("module")
+	log := GetOrCreateLogger("module")
 	log.Info("foo")
 	if "foo" != getLastLine(b1) {
 		t.Errorf("Unexpected line: %s", getLastLine(b1))
@@ -170,7 +170,7 @@ func BenchmarkStringFormatter(b *testing.B) {
 
 	backend := InitForTesting(DEBUG)
 	buf := &bytes.Buffer{}
-	log := MustGetLogger("module")
+	log := GetOrCreateLogger("module")
 	log.Debug("")
 	record := MemoryRecordN(backend, 0)
 

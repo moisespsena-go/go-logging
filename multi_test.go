@@ -11,7 +11,7 @@ func TestMultiLogger(t *testing.T) {
 	log2 := NewMemoryBackend(8)
 	SetBackend(MultiLogger(log1, log2))
 
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 	log.Debug("log")
 
 	if "log" != MemoryRecordN(log1, 0).Formatted(0) {
@@ -33,7 +33,7 @@ func TestMultiLoggerLevel(t *testing.T) {
 	multi.SetLevel(ERROR, "test")
 	SetBackend(multi)
 
-	log := MustGetLogger("test")
+	log := GetOrCreateLogger("test")
 	log.Notice("log")
 
 	if nil != MemoryRecordN(log1, 0) || nil != MemoryRecordN(log2, 0) {

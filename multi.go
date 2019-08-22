@@ -36,6 +36,18 @@ func (b *multiLogger) Log(level Level, calldepth int, rec *Record) (err error) {
 	return
 }
 
+// Print passes the args record to all print.
+func (b *multiLogger) Print(args ...interface{}) (err error) {
+	for _, backend := range b.backends {
+		if p, ok := backend.(Printer); ok {
+			if err = p.Print(args); err != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
 // GetLevel returns the highest level enabled by all backends.
 func (b *multiLogger) GetLevel(module string) Level {
 	var level Level
