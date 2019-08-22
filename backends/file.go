@@ -19,13 +19,22 @@ type FileOptions struct {
 }
 
 type WriteCloserBackend struct {
-	io.Closer
+	io.WriteCloser
 	logging.Backend
 	Name  string
 	Async bool
 }
 
-func (this WriteCloserBackend) Log(level logging.Level, calldepth int, rec *logging.Record) (err error) {
+func NewWriteCloserBackend(name string, wc io.WriteCloser, async bool) *WriteCloserBackend {
+	return &WriteCloserBackend{
+		WriteCloser: wc,
+		Name:        name,
+		Backend:     logging.NewLogBackend(wc, "", log.LstdFlags),
+		Async:       async,
+	}
+}
+
+func (this *WriteCloserBackend) Log(level logging.Level, calldepth int, rec *logging.Record) (err error) {
 	if this.Async {
 		go func() {
 			r := *rec
@@ -38,21 +47,21 @@ func (this WriteCloserBackend) Log(level logging.Level, calldepth int, rec *logg
 	return this.Backend.Log(level, calldepth, rec)
 }
 
-func (this WriteCloserBackend) Close() error {
-	if this.Closer != nil {
-		return this.Closer.Close()
+func (this *WriteCloserBackend) Close() error {
+	if this.WriteCloser != nil {
+		return this.WriteCloser.Close()
 	}
 	return nil
 }
 
-func NewFileBackend(path string, options FileOptions) (b *FilePrintBackend, err error) {
+func NewFileBackend(path string, options FileOptions) (b *FileBackend, err error) {
 	var f *os.File
 	if options.Perm == 0 {
 		options.Perm = 0666
 	}
 
 	if v, ok := fileMap.Load(path); ok {
-		b = v.(*FilePrintBackend)
+		b = v.(*FileBackend)
 		return
 	}
 
@@ -65,26 +74,24 @@ func NewFileBackend(path string, options FileOptions) (b *FilePrintBackend, err 
 		return
 	}
 
-	b = &FilePrintBackend{
-		&WriteCloserBackend{
-			Closer:  f,
-			Name:    "file:" + path,
-			Backend: logging.NewLogBackend(f, "", log.LstdFlags),
-			Async:   options.Async,
-		}, func(args ...interface{}) (err error) {
-			_, err = f.WriteString(fmt.Sprint(args...)+"\n")
-			return
-		},
+	b = &FileBackend{
+		path,
+		NewWriteCloserBackend("file:"+path, f, options.Async),
 	}
 	fileMap.Store(path, b)
 	return
 }
 
-type FilePrintBackend struct {
+type FileBackend struct {
+	path string
 	*WriteCloserBackend
-	PrintFunc func(args ...interface{}) (err error)
 }
 
-func (this FilePrintBackend) Print(args ...interface{}) (err error) {
-	return this.PrintFunc(args...)
+func (this *FileBackend) Print(args ...interface{}) (err error) {
+	_, err = this.Write([]byte(fmt.Sprint(args...) + "\n"))
+	return
+}
+
+func (this *FileBackend) Path() string {
+	return this.path
 }
