@@ -35,6 +35,8 @@ type Logger interface {
 	Debug(args ...interface{})
 	// Debugf logs a message using DEBUG as log level.
 	Debugf(format string, args ...interface{})
+	// Writer returns the log writer.
+	Writer() LogWriter
 }
 
 // LogPrefixer is an interface for types that creates log records with prefix.

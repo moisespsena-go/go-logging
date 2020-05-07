@@ -12,7 +12,7 @@ var log = logging.GetOrCreateLogger("example")
 // which is dependent on the log level. Many fields have a custom output
 // formatting too, eg. the time returns the hour down to the milli second.
 var format = logging.MustStringFormatter(
-	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+	`%{color}%{time:15:04:05.000} [%{module}] %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
 )
 
 // Password is just an example type implementing the Redactor interface. Any
@@ -46,4 +46,10 @@ func main() {
 	log.Warning("warning")
 	log.Error("err")
 	log.Critical("crit")
+
+	// Tee dispatch message to N loggers
+	logA := logging.GetOrCreateLogger("a")
+	logB := logging.GetOrCreateLogger("b")
+	logC := logging.Tee(logA, logB)
+	logC.Notice("tee example")
 }

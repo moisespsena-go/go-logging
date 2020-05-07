@@ -75,3 +75,16 @@ func (b *multiLogger) IsEnabledFor(level Level, module string) bool {
 	}
 	return false
 }
+
+// Tee copy log messages to all loggers.
+func Tee(logger ...Logger) Logger {
+	var writers = make([]LogWriter, len(logger))
+	for i, l := range logger {
+		writers[i] = l.Writer()
+	}
+	return &Log{Basic: NewBasic(NewWriter(func(lvl Level, extraCalldepth int, format *string, args ...interface{}) {
+		for _, w := range writers {
+			w.Write(lvl, 2+extraCalldepth, format, args...)
+		}
+	}))}
+}

@@ -5,7 +5,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
+
+	path_helpers "github.com/moisespsena-go/path-helpers"
 
 	"github.com/moisespsena-go/logging"
 )
@@ -39,7 +42,7 @@ func (this *WriteCloserBackend) Log(level logging.Level, calldepth int, rec *log
 		go func() {
 			r := *rec
 			if err := this.Backend.Log(level, calldepth, &r); err != nil {
-				log_.Errorf("http async %q failed: %s", this.Name, err.Error())
+				log_.Errorf("write_closer %q failed: %s", this.Name, err.Error())
 			}
 		}()
 		return
@@ -62,6 +65,10 @@ func NewFileBackend(path string, options FileOptions) (b *FileBackend, err error
 
 	if v, ok := fileMap.Load(path); ok {
 		b = v.(*FileBackend)
+		return
+	}
+
+	if err = path_helpers.MkdirAllIfNotExists(filepath.Dir(path)); err != nil {
 		return
 	}
 

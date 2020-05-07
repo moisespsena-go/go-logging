@@ -7,10 +7,6 @@ is customizable and supports different logging backends like syslog, file and
 memory. Multiple backends can be utilized with different log levels per backend
 and logger.
 
-**_NOTE:_** backwards compatibility promise have been dropped for master. Please
-vendor this package or use `gopkg.in/moisespsena-go/logging.v1` for previous version. See
-[changelog](CHANGELOG.md) for details.
-
 ## Example
 
 Let's have a look at an [example](examples/example.go) which demonstrates most
@@ -80,7 +76,7 @@ After this command *go-logging* is ready to use. Its source will be in:
 
     $GOPATH/src/pkg/github.com/moisespsena-go/logging
 
-You can use `go get -u` to update the package.
+You can use `go get -u github.com/moisespsena-go/logging` to update the package.
 
 ## Documentation
 

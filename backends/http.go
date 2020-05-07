@@ -13,7 +13,9 @@ import (
 	"github.com/moisespsena-go/logging"
 )
 
-var log_ = logging.GetOrCreateLogger("github.com/moisespsena-go/logging/backends")
+var (
+	log_ = logging.GetOrCreateLogger("github.com/moisespsena-go/logging/backends")
+)
 
 type HttpOptions struct {
 	Timeout   int
@@ -30,6 +32,7 @@ type HttpBackend struct {
 	Formatted     bool
 	defaultClient bool
 	Async         bool
+	Logger        logging.Logger
 }
 
 func NewHttpBackend(URL url.URL, opt HttpOptions, client *http.Client) (wsb *HttpBackend) {
@@ -57,6 +60,11 @@ func NewHttpBackend(URL url.URL, opt HttpOptions, client *http.Client) (wsb *Htt
 		client.Transport = transport
 	}
 
+	logPrefix := "http"
+	if opt.Async {
+		logPrefix += " async"
+	}
+
 	wsb = &HttpBackend{
 		Client:        client,
 		URL:           URL,
@@ -64,11 +72,12 @@ func NewHttpBackend(URL url.URL, opt HttpOptions, client *http.Client) (wsb *Htt
 		Formatted:     opt.Formatted,
 		defaultClient: defaultClient,
 		Async:         opt.Async,
+		Logger:        logging.WithPrefix(log_, logPrefix),
 	}
 	return
 }
 
-func (this HttpBackend) log(level logging.Level, calldepth int, rec *logging.Record) (err error) {
+func (this *HttpBackend) log(level logging.Level, calldepth int, rec *logging.Record) (err error) {
 	var msg []byte
 	if this.Formatted {
 		msg = []byte(rec.Formatted(calldepth))
@@ -91,7 +100,7 @@ func (this HttpBackend) log(level logging.Level, calldepth int, rec *logging.Rec
 	return
 }
 
-func (this HttpBackend) print(args ...interface{}) (err error) {
+func (this *HttpBackend) print(args ...interface{}) (err error) {
 	msg := []byte(fmt.Sprint(args...))
 	var resp *http.Response
 	defer func() {
@@ -111,11 +120,11 @@ func (this HttpBackend) print(args ...interface{}) (err error) {
 	return
 }
 
-func (this HttpBackend) Print(args ...interface{}) (err error) {
+func (this *HttpBackend) Print(args ...interface{}) (err error) {
 	if this.Async {
 		go func() {
 			if err := this.print(args...); err != nil {
-				log_.Errorf("http async %q failed: %s", this.URL.String(), err.Error())
+				this.Logger.Errorf("%q failed: %s", this.URL.String(), err.Error())
 			}
 		}()
 	} else {
@@ -124,12 +133,12 @@ func (this HttpBackend) Print(args ...interface{}) (err error) {
 	return
 }
 
-func (this HttpBackend) Log(level logging.Level, calldepth int, rec *logging.Record) (err error) {
+func (this *HttpBackend) Log(level logging.Level, calldepth int, rec *logging.Record) (err error) {
 	if this.Async {
 		go func() {
 			r := *rec
 			if err := this.log(level, calldepth, &r); err != nil {
-				log_.Errorf("http async %q failed: %s", this.URL.String(), err.Error())
+				this.Logger.Errorf("%q failed: %s", this.URL.String(), err.Error())
 			}
 		}()
 	} else {
@@ -138,7 +147,7 @@ func (this HttpBackend) Log(level logging.Level, calldepth int, rec *logging.Rec
 	return
 }
 
-func (this HttpBackend) Close() error {
+func (this *HttpBackend) Close() error {
 	if !this.defaultClient {
 		this.Client.CloseIdleConnections()
 	}
